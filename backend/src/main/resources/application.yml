@@ -28,3 +28,7 @@ management:
     health:
       probes:
         enabled: true
+
+evpulse:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
