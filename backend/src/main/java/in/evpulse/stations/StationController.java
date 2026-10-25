@@ -16,9 +16,11 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 public class StationController {
     private final StationRepository repository;
+    private final OpenChargeMapService openChargeMapService;
 
-    public StationController(StationRepository repository) {
+    public StationController(StationRepository repository, OpenChargeMapService openChargeMapService) {
         this.repository = repository;
+        this.openChargeMapService = openChargeMapService;
     }
 
     @GetMapping
@@ -33,11 +35,30 @@ public class StationController {
         if (city.isBlank() || city.length() > 100) {
             throw new IllegalArgumentException("city must be between 1 and 100 characters");
         }
+
+        String normalizedCity = city.trim();
         List<StationOffer> offers = repository.search(
-                city.trim(), q, connectorType, minPowerKw, maxPricePerKwh, limit, offset);
-        long total = repository.count(city.trim(), q, connectorType, minPowerKw, maxPricePerKwh);
-        return new StationSearchResponse(city.trim(), total, limit, offset, offers,
-                "Prices may be missing or stale. Check tariffCheckedAt, confidence and source before relying on a tariff.");
+                normalizedCity, q, connectorType, minPowerKw, maxPricePerKwh, limit, offset);
+        long total = repository.count(normalizedCity, q, connectorType, minPowerKw, maxPricePerKwh);
+        String dataQualityNote = "Prices may be missing or stale. Check tariffCheckedAt, confidence and source before relying on a tariff.";
+
+        // The database remains the source of curated records. When it has no match,
+        // optionally use Open Charge Map as a read-only discovery fallback for the pilot city.
+        if (offers.isEmpty() && total == 0 && offset == 0
+                && normalizedCity.equalsIgnoreCase("Hyderabad")) {
+            List<StationOffer> discovered = openChargeMapService.discoverHyderabad(
+                    q, connectorType, minPowerKw, maxPricePerKwh, limit);
+            if (!discovered.isEmpty()) {
+                offers = discovered;
+                total = discovered.size();
+                dataQualityNote = "Discovery records supplied by Open Charge Map (open data only). Tariffs are not verified or inferred; confirm details with the operator. This is not live charger availability.";
+            } else if (!openChargeMapService.isConfigured()) {
+                dataQualityNote += " To enable sourced station discovery, configure OPENCHARGEMAP_API_KEY. No sample station data is fabricated.";
+            } else {
+                dataQualityNote += " No matching records were returned by the configured discovery source.";
+            }
+        }
+        return new StationSearchResponse(normalizedCity, total, limit, offset, offers, dataQualityNote);
     }
 
     public record StationSearchResponse(
