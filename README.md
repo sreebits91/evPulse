@@ -18,7 +18,7 @@ evPulse helps drivers compare station locations, connector compatibility, chargi
 - **Frontend:** Next.js, React and TypeScript.
 - **API:** `GET /api/v1/health`, `GET /api/v1/stations`.
 - **Database:** operators, stations, connectors, tariff sources and tariffs.
-- **CI:** backend verification and frontend production build.
+- **CI:** backend verification, frontend production build and Docker image builds.
 
 ## Run the complete app with Docker
 
@@ -32,6 +32,20 @@ docker compose up --build
 ```
 
 When the containers are healthy, open the frontend at `http://localhost:3000` and the API health endpoint at `http://localhost:8080/api/v1/health`. The API applies Flyway migrations automatically on startup. The Compose database password is a local-development default; set `POSTGRES_PASSWORD` to a strong value before using this setup anywhere shared or public. To stop the stack, run `docker compose down`; to also delete the local database volume, run `docker compose down -v`.
+
+### Enable real station discovery
+
+1. Register for an API key at [Open Charge Map](https://www.openchargemap.org/develop/api).
+2. Export the key before starting Compose:
+
+   ```bash
+   export OPENCHARGEMAP_API_KEY="your-key"
+   docker compose up --build
+   ```
+
+3. Search Hyderabad. If the curated database has no matching rows, evPulse can show openly licensed Open Charge Map discovery records. These are attributed to the provider and are not copied into the curated database automatically.
+
+Discovery data may not include structured tariffs. evPulse leaves the price blank rather than deriving or inventing one. A maximum-price filter will not treat an unknown price as a match. Open Charge Map's terms and licensing apply; see [its API documentation](https://www.openchargemap.org/develop/api).
 
 ## Local development
 
