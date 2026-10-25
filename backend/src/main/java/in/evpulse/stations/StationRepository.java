@@ -110,6 +110,7 @@ public class StationRepository {
                    LIMIT 1
               ) t ON TRUE
              WHERE LOWER(s.city) = LOWER(?)
+               AND s.status IN ('OPERATIONAL', 'UNKNOWN')
                AND (CAST(? AS text) IS NULL OR s.name ILIKE '%' || ? || '%'
                     OR COALESCE(s.locality, '') ILIKE '%' || ? || '%'
                     OR s.address ILIKE '%' || ? || '%'
