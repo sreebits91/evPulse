@@ -2,7 +2,6 @@ package in.evpulse.stations;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
@@ -133,15 +132,6 @@ public class OpenChargeMapService {
         long id = poi.path("ID").asLong(0);
         String status = text(poi.path("StatusType"), "Title").toLowerCase();
         String stationStatus = status.contains("operational") ? "OPERATIONAL" : "UNKNOWN";
-        String checked = text(poi, "DateLastVerified");
-        OffsetDateTime checkedAt = null;
-        if (!checked.isBlank()) {
-            try {
-                checkedAt = OffsetDateTime.parse(checked);
-            } catch (RuntimeException ignored) {
-                // Invalid upstream dates are represented as unavailable.
-            }
-        }
         int quantity = connection == null ? 0 : connection.path("Quantity").asInt(0);
         if (quantity < 0) quantity = 0;
         String operator = text(poi.path("OperatorInfo"), "Title");
@@ -154,7 +144,7 @@ public class OpenChargeMapService {
                 currentType.isBlank() ? null : currentType, quantity,
                 null, null, "INR", null, "UNVERIFIED",
                 "Open Charge Map", "https://openchargemap.org/site/poi/details/" + id,
-                checkedAt, false);
+                null, false);
     }
 
     private static String normalizeConnector(String value) {
