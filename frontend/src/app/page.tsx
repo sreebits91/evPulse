@@ -38,7 +38,10 @@ type SearchResponse = {
   dataQualityNote: string;
 };
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api/v1").replace(/\/$/, "");
+const API_BASE = (
+  process.env.NEXT_PUBLIC_API_BASE_URL ??
+  (process.env.NODE_ENV === "development" ? "http://localhost:8080/api/v1" : "")
+).replace(/\/$/, "");
 
 function money(value: number | null, currency: string | null) {
   if (value === null || value === undefined) return "Price not published";
@@ -79,9 +82,14 @@ export default function Home() {
       const response = await fetch(`${API_BASE}/stations?${params.toString()}`, { cache: "no-store" });
       if (!response.ok) throw new Error(`Station service returned HTTP ${response.status}`);
       setData(await response.json() as SearchResponse);
-    } catch {
+    } catch (caught) {
       setData(null);
-      setError("We couldn’t reach the station service. Start the backend on port 8080 and try again.");
+      const message = caught instanceof Error ? caught.message : "Unknown request error";
+      setError(
+        message.startsWith("Station service returned HTTP")
+          ? message
+          : `Could not reach the station API at ${API_BASE || "the current website origin"}. Check NEXT_PUBLIC_API_BASE_URL, backend availability, and CORS configuration.`
+      );
     } finally {
       setLoading(false);
     }
@@ -133,7 +141,7 @@ export default function Home() {
         <div className="results-title"><div><p className="eyebrow">CHARGING, MADE CLEAR</p><h2>{data ? `${data.total} matching offers` : "Your charging shortlist"}</h2></div><span className="results-city">⌖ {city || "Hyderabad"}</span></div>
         {error && <div className="notice error-notice"><strong>Service unavailable</strong><p>{error}</p></div>}
         {!error && loading && <div className="empty-state"><div className="loader" /><p>Finding matching charging options…</p></div>}
-        {!error && !loading && data && data.offers.length === 0 && <div className="empty-state"><div className="empty-icon">⚡</div><h3>No verified station records yet</h3><p>There are no station records matching this search in the current catalog. We won’t invent station names or prices. Add sourced station data to the backend to populate this view.</p></div>}
+        {!error && !loading && data && data.offers.length === 0 && <div className="empty-state"><div className="empty-icon">⚡</div><h3>No matching station records</h3><p>{data.dataQualityNote || "No station records matched this search. Try changing the city or filters."}</p></div>}
         {!error && !loading && data && data.offers.length > 0 && <div className="station-grid">{data.offers.map((station, index) => (
           <article className="station-card" key={`${station.stationId}-${station.connectorType ?? "none"}-${index}`}>
             <div className="card-top"><span className="station-icon">ϟ</span><span className={station.tariffCurrent ? "status status-current" : "status status-stale"}>{station.tariffCurrent ? "Tariff recently checked" : "Check price first"}</span></div>
