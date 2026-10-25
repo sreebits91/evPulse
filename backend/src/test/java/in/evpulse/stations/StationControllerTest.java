@@ -21,11 +21,17 @@ class StationControllerTest {
     @MockitoBean
     private StationRepository repository;
 
+    @MockitoBean
+    private OpenChargeMapService openChargeMapService;
+
     @Test
     void defaultsToHyderabadAndReturnsSearchMetadata() throws Exception {
         when(repository.search(eq("Hyderabad"), isNull(), isNull(), isNull(), isNull(), eq(20), eq(0)))
                 .thenReturn(List.of());
         when(repository.count(eq("Hyderabad"), isNull(), isNull(), isNull(), isNull())).thenReturn(0L);
+        when(openChargeMapService.discoverHyderabad(isNull(), isNull(), isNull(), isNull(), eq(20)))
+                .thenReturn(List.of());
+        when(openChargeMapService.isConfigured()).thenReturn(false);
 
         mockMvc.perform(get("/api/v1/stations"))
                 .andExpect(status().isOk())
@@ -33,7 +39,7 @@ class StationControllerTest {
                 .andExpect(jsonPath("$.total").value(0))
                 .andExpect(jsonPath("$.limit").value(20))
                 .andExpect(jsonPath("$.offers").isArray())
-                .andExpect(jsonPath("$.dataQualityNote").exists());
+                .andExpect(jsonPath("$.dataQualityNote").value(org.hamcrest.Matchers.containsString("OPENCHARGEMAP_API_KEY")));
     }
 
     @Test
