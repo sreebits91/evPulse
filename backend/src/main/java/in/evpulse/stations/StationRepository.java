@@ -80,7 +80,8 @@ public class StationRepository {
                     OR COALESCE(o.name, '') ILIKE '%' || ? || '%')
                AND (CAST(? AS text) IS NULL OR c.connector_type = ?)
                AND (CAST(? AS numeric) IS NULL OR c.power_kw >= ?)
-               AND (CAST(? AS numeric) IS NULL OR t.price_per_kwh <= ?)
+               AND (CAST(? AS numeric) IS NULL OR
+                    (t.price_per_kwh <= ? AND t.checked_at >= NOW() - INTERVAL '30 days'))
              ORDER BY CASE WHEN t.price_per_kwh IS NULL THEN 1 ELSE 0 END,
                       t.price_per_kwh ASC, s.name ASC
              LIMIT ? OFFSET ?
@@ -117,7 +118,8 @@ public class StationRepository {
                     OR COALESCE(o.name, '') ILIKE '%' || ? || '%')
                AND (CAST(? AS text) IS NULL OR c.connector_type = ?)
                AND (CAST(? AS numeric) IS NULL OR c.power_kw >= ?)
-               AND (CAST(? AS numeric) IS NULL OR t.price_per_kwh <= ?)
+               AND (CAST(? AS numeric) IS NULL OR
+                    (t.price_per_kwh <= ? AND t.checked_at >= NOW() - INTERVAL '30 days'))
             """;
         String q = blankToNull(query);
         String connector = blankToNull(connectorType);
