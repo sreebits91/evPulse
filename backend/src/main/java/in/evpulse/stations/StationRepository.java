@@ -87,7 +87,7 @@ public class StationRepository {
         String q = blankToNull(query);
         String connector = blankToNull(connectorType);
         return jdbc.query(sql, MAPPER,
-                city, q, q, q, q, q, q, connector, connector,
+                city, q, q, q, q, q, connector, connector,
                 minPowerKw, minPowerKw, maxPricePerKwh, maxPricePerKwh,
                 limit, offset);
     }
