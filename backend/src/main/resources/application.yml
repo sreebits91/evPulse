@@ -24,3 +24,5 @@ management:
 evpulse:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+  openchargemap:
+    api-key: ${OPENCHARGEMAP_API_KEY:}
