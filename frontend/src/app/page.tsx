@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 type StationOffer = {
   stationId: number;
@@ -69,6 +69,7 @@ export default function Home() {
   const [data, setData] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [sortBy, setSortBy] = useState("recommended");
 
   const search = useCallback(async () => {
     setLoading(true);
@@ -138,11 +139,11 @@ export default function Home() {
       </section>
 
       <section className="wrap results-section">
-        <div className="results-title"><div><p className="eyebrow">CHARGING, MADE CLEAR</p><h2>{data ? `${data.total} matching offers` : "Your charging shortlist"}</h2></div><span className="results-city">⌖ {city || "Hyderabad"}</span></div>
+        <div className="results-title"><div><p className="eyebrow">CHARGING, MADE CLEAR</p><h2>{data ? `${data.total} matching offers` : "Your charging shortlist"}</h2></div><div className="results-tools"><span className="results-city">⌖ {city || "Hyderabad"}</span>{data && data.offers.length > 1 && <label className="sort-control"><span>Sort by</span><select value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="recommended">Recommended</option><option value="price">Lowest tariff</option><option value="power">Highest power</option><option value="freshness">Freshest tariff</option></select></label>}</div></div>
         {error && <div className="notice error-notice"><strong>Service unavailable</strong><p>{error}</p></div>}
         {!error && loading && <div className="empty-state"><div className="loader" /><p>Finding matching charging options…</p></div>}
         {!error && !loading && data && data.offers.length === 0 && <div className="empty-state"><div className="empty-icon">⚡</div><h3>No matching station records</h3><p>{data.dataQualityNote || "No station records matched this search. Try changing the city or filters."}</p></div>}
-        {!error && !loading && data && data.offers.length > 0 && <div className="station-grid">{data.offers.map((station, index) => (
+        {!error && !loading && data && sortedOffers.length > 0 && <div className="station-grid">{sortedOffers.map((station, index) => (
           <article className="station-card" key={`${station.stationId}-${station.connectorType ?? "none"}-${index}`}>
             <div className="card-top"><span className="station-icon">ϟ</span><span className={station.tariffCurrent ? "status status-current" : "status status-stale"}>{station.tariffCurrent ? "Tariff recently checked" : "Check price first"}</span></div>
             <h3>{station.stationName}</h3><p className="station-location">{station.locality ? `${station.locality}, ` : ""}{station.city}</p>
