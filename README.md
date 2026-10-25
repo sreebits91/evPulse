@@ -20,6 +20,19 @@ evPulse helps drivers compare station locations, connector compatibility, chargi
 - **Database:** operators, stations, connectors, tariff sources and tariffs.
 - **CI:** backend verification and frontend production build.
 
+## Run the complete app with Docker
+
+Requirements: Docker Desktop or Docker Engine with the Compose plugin.
+
+```bash
+git clone https://github.com/sreebits91/evPulse.git
+cd evPulse
+git checkout evpulse-foundation
+docker compose up --build
+```
+
+When the containers are healthy, open the frontend at `http://localhost:3000` and the API health endpoint at `http://localhost:8080/api/v1/health`. The API applies Flyway migrations automatically on startup. The Compose database password is a local-development default; set `POSTGRES_PASSWORD` to a strong value before using this setup anywhere shared or public. To stop the stack, run `docker compose down`; to also delete the local database volume, run `docker compose down -v`.
+
 ## Local development
 
 Requirements: Java 21+, Maven 3.9+, Node.js 22+, npm and PostgreSQL 16.
