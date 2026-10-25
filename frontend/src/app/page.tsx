@@ -96,6 +96,23 @@ export default function Home() {
     }
   }, [city, query, connector, minPower, maxPrice]);
 
+  const sortedOffers = useMemo(() => {
+    const offers = [...(data?.offers ?? [])];
+    switch (sortBy) {
+      case "price":
+        return offers.sort((a, b) => (a.pricePerKwh ?? Number.POSITIVE_INFINITY) - (b.pricePerKwh ?? Number.POSITIVE_INFINITY));
+      case "power":
+        return offers.sort((a, b) => (b.powerKw ?? -1) - (a.powerKw ?? -1));
+      case "freshness":
+        return offers.sort((a, b) => {
+          if (a.tariffCurrent !== b.tariffCurrent) return a.tariffCurrent ? -1 : 1;
+          return new Date(b.tariffCheckedAt ?? 0).getTime() - new Date(a.tariffCheckedAt ?? 0).getTime();
+        });
+      default:
+        return offers;
+    }
+  }, [data?.offers, sortBy]);
+
   useEffect(() => {
     void search();
     // Load the initial city once; filter changes are applied on form submission.
