@@ -43,3 +43,25 @@ jobs:
         run: npm install
       - name: Build frontend
         run: npm run build
+
+  container-images:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: false
+          tags: evpulse-api:ci
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: false
+          build-args: |
+            NEXT_PUBLIC_API_BASE_URL=http://localhost:8080/api/v1
+          tags: evpulse-web:ci
