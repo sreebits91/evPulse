@@ -2,12 +2,22 @@ package in.evpulse.stations;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
 
 class OpenChargeMapServiceTest {
+    @Test
+    void stationStatusUsesExactOperationalMatch() {
+        assertEquals("OPERATIONAL", OpenChargeMapService.normalizeStationStatus("Operational"));
+        assertEquals("TEMPORARILY_CLOSED", OpenChargeMapService.normalizeStationStatus("Not Operational"));
+        assertEquals("TEMPORARILY_CLOSED", OpenChargeMapService.normalizeStationStatus("Temporarily Unavailable"));
+        assertEquals("UNKNOWN", OpenChargeMapService.normalizeStationStatus("Planned"));
+        assertEquals("UNKNOWN", OpenChargeMapService.normalizeStationStatus(null));
+    }
+
     @Test
     void discoveryIsDisabledWhenApiKeyIsMissing() {
         OpenChargeMapService service = new OpenChargeMapService(RestClient.builder(), "");
