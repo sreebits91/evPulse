@@ -35,13 +35,9 @@ When the containers are healthy, open the frontend at `http://localhost:3000` an
 
 ### Enable real station discovery
 
-1. Register for an API key at [Open Charge Map](https://www.openchargemap.org/develop/api).
-2. Export the key before starting Compose:
-
-   ```bash
-   export OPENCHARGEMAP_API_KEY="your-key"
-   docker compose up --build
-   ```
+1. Copy the environment template: `cp .env.example .env`.
+2. Register for an API key at [Open Charge Map](https://www.openchargemap.org/develop/api) and add it as `OPENCHARGEMAP_API_KEY=your-key` in `.env`.
+3. Start the app with `docker compose up --build`. Compose reads the root `.env` automatically.
 
 3. Search Hyderabad. If the curated database has no matching rows, evPulse can show openly licensed Open Charge Map discovery records. These are attributed to the provider and are not copied into the curated database automatically.
 
