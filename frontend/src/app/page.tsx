@@ -138,7 +138,7 @@ export default function Home() {
           <article className="station-card" key={`${station.stationId}-${station.connectorType ?? "none"}-${index}`}>
             <div className="card-top"><span className="station-icon">ϟ</span><span className={station.tariffCurrent ? "status status-current" : "status status-stale"}>{station.tariffCurrent ? "Tariff recently checked" : "Check price first"}</span></div>
             <h3>{station.stationName}</h3><p className="station-location">{station.locality ? `${station.locality}, ` : ""}{station.city}</p>
-            <p className="station-address">{station.address}</p>
+            <p className="station-address">{station.address}</p><p className="station-location">Station status: {station.stationStatus.replaceAll("_", " ").toLowerCase()}</p>
             <div className="price-block"><span>Energy tariff</span><strong>{money(station.pricePerKwh, station.currency)}{station.pricePerKwh !== null && <small> / kWh</small>}</strong></div>
             <div className="specs"><div><span>CONNECTOR</span><strong>{station.connectorType ?? "Not listed"}</strong></div><div><span>MAX POWER</span><strong>{station.powerKw !== null ? `${station.powerKw} kW` : "Not listed"}</strong></div><div><span>PLUGS</span><strong>{station.connectorQuantity || "Not listed"}</strong></div></div>
             <div className="source-row"><span>Source: {station.sourceName ?? "Not recorded"}</span><span>Checked {formatCheckedAt(station.tariffCheckedAt)}</span></div>
