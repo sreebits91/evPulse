@@ -68,19 +68,18 @@ public class StationRepository {
                      AND (t1.connector_id IS NULL OR t1.connector_id = c.id)
                      AND t1.valid_from <= NOW()
                      AND (t1.valid_until IS NULL OR t1.valid_until > NOW())
-                   ORDER BY (t1.connector_id = c.id) DESC, t1.checked_at DESC
+                   ORDER BY CASE WHEN t1.connector_id = c.id THEN 1 ELSE 0 END DESC, t1.checked_at DESC
                    LIMIT 1
               ) t ON TRUE
               LEFT JOIN tariff_sources src ON src.id = t.source_id
              WHERE LOWER(s.city) = LOWER(?)
-               AND (? IS NULL OR s.status = 'OPERATIONAL' OR s.status = 'UNKNOWN')
-               AND (? IS NULL OR s.name ILIKE '%' || ? || '%'
+               AND (CAST(? AS text) IS NULL OR s.name ILIKE '%' || ? || '%'
                     OR COALESCE(s.locality, '') ILIKE '%' || ? || '%'
                     OR s.address ILIKE '%' || ? || '%'
                     OR COALESCE(o.name, '') ILIKE '%' || ? || '%')
-               AND (? IS NULL OR c.connector_type = ?)
-               AND (? IS NULL OR c.power_kw >= ?)
-               AND (? IS NULL OR t.price_per_kwh <= ?)
+               AND (CAST(? AS text) IS NULL OR c.connector_type = ?)
+               AND (CAST(? AS numeric) IS NULL OR c.power_kw >= ?)
+               AND (CAST(? AS numeric) IS NULL OR t.price_per_kwh <= ?)
              ORDER BY CASE WHEN t.price_per_kwh IS NULL THEN 1 ELSE 0 END,
                       t.price_per_kwh ASC, s.name ASC
              LIMIT ? OFFSET ?
