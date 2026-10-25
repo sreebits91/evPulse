@@ -66,7 +66,6 @@ export default function Home() {
   const [data, setData] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [searchKey, setSearchKey] = useState(0);
 
   const search = useCallback(async () => {
     setLoading(true);
@@ -88,11 +87,14 @@ export default function Home() {
     }
   }, [city, query, connector, minPower, maxPrice]);
 
-  useEffect(() => { void search(); }, [search, searchKey]);
+  useEffect(() => {
+    void search();
+    // Load the initial city once; filter changes are applied on form submission.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSearchKey((value) => value + 1);
     void search();
   }
 
