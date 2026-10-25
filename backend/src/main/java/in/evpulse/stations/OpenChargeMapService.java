@@ -130,8 +130,7 @@ public class OpenChargeMapService {
             String name, String address, String locality, String city,
             String connectorType, BigDecimal powerKw, String currentType) {
         long id = poi.path("ID").asLong(0);
-        String status = text(poi.path("StatusType"), "Title").toLowerCase();
-        String stationStatus = status.contains("operational") ? "OPERATIONAL" : "UNKNOWN";
+        String stationStatus = normalizeStationStatus(text(poi.path("StatusType"), "Title"));
         int quantity = connection == null ? 0 : connection.path("Quantity").asInt(0);
         if (quantity < 0) quantity = 0;
         String operator = text(poi.path("OperatorInfo"), "Title");
@@ -170,6 +169,19 @@ public class OpenChargeMapService {
             }
         }
         return "Open Charge Map · Open Data (provider attribution unavailable; open source record)";
+    }
+
+    static String normalizeStationStatus(String status) {
+        if (status == null || status.isBlank()) return "UNKNOWN";
+        String normalized = status.trim().toLowerCase();
+        if (normalized.equals("operational")) return "OPERATIONAL";
+        if (normalized.equals("not operational")
+                || normalized.contains("temporarily unavailable")
+                || normalized.contains("temporarily closed")
+                || normalized.equals("decommissioned")) {
+            return "TEMPORARILY_CLOSED";
+        }
+        return "UNKNOWN";
     }
 
     private static String normalizeConnector(String value) {
