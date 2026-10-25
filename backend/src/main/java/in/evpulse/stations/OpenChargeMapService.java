@@ -13,17 +13,20 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Read-only discovery adapter for Open Charge Map. Tariffs are never inferred
- * from location or connector data; the provider commonly has no structured tariff.
+ * Read-only discovery adapter for Open Charge Map. Upstream results are cached
+ * briefly to avoid repeated identical API calls. Tariffs are never inferred.
  */
 @Service
 public class OpenChargeMapService {
     private static final String BASE_URL = "https://api.openchargemap.io/v3/poi/";
     private static final double HYDERABAD_LATITUDE = 17.3850;
     private static final double HYDERABAD_LONGITUDE = 78.4867;
+    private static final long CACHE_TTL_MILLIS = 10 * 60 * 1000L;
 
     private final RestClient restClient;
     private final String apiKey;
+    private volatile List<JsonNode> cachedPois = List.of();
+    private volatile long cacheExpiresAtMillis;
 
     public OpenChargeMapService(
             RestClient.Builder builder,
@@ -39,86 +42,87 @@ public class OpenChargeMapService {
     public List<StationOffer> discoverHyderabad(
             String query, String connectorType, BigDecimal minPowerKw,
             BigDecimal maxPricePerKwh, int limit) {
-        if (!isConfigured()) {
-            return List.of();
-        }
-        // Unknown prices cannot honestly satisfy a maximum-price filter.
-        if (maxPricePerKwh != null) {
+        if (!isConfigured() || maxPricePerKwh != null) {
+            // Unknown prices cannot honestly satisfy a maximum-price filter.
             return List.of();
         }
 
-        String uri = UriComponentsBuilder.fromUriString(BASE_URL)
-                .queryParam("output", "json")
-                .queryParam("countrycode", "IN")
-                .queryParam("latitude", HYDERABAD_LATITUDE)
-                .queryParam("longitude", HYDERABAD_LONGITUDE)
-                .queryParam("distance", 30)
-                .queryParam("distanceunit", "KM")
-                .queryParam("maxresults", Math.min(Math.max(limit * 3, 30), 100))
-                .queryParam("opendata", "true")
-                .queryParam("compact", "false")
-                .queryParam("verbose", "false")
-                .build()
-                .encode()
-                .toUriString();
-
-        try {
-            JsonNode response = restClient.get()
-                    .uri(uri)
-                    .header("X-API-Key", apiKey)
-                    .header(HttpHeaders.USER_AGENT, "evPulse/0.1 (EV charging discovery)")
-                    .retrieve()
-                    .body(JsonNode.class);
-            if (response == null || !response.isArray()) {
-                return List.of();
+        List<StationOffer> offers = new ArrayList<>();
+        for (JsonNode poi : fetchPois()) {
+            JsonNode addressInfo = poi.path("AddressInfo");
+            if (addressInfo.isMissingNode() || addressInfo.isNull()) {
+                continue;
+            }
+            String name = text(addressInfo, "Title");
+            String address = text(addressInfo, "AddressLine1");
+            String city = firstNonBlank(text(addressInfo, "Town"), "Hyderabad");
+            if (name.isBlank() || address.isBlank()
+                    || !matchesQuery(query, name, address, text(addressInfo, "AddressLine2"), city)) {
+                continue;
             }
 
-            List<StationOffer> offers = new ArrayList<>();
-            for (JsonNode poi : response) {
-                JsonNode addressInfo = poi.path("AddressInfo");
-                if (addressInfo.isMissingNode() || addressInfo.isNull()) {
-                    continue;
-                }
-                String name = text(addressInfo, "Title");
-                String address = text(addressInfo, "AddressLine1");
-                String city = firstNonBlank(text(addressInfo, "Town"), "Hyderabad");
-                if (name.isBlank() || address.isBlank()) {
-                    continue;
-                }
-                String locality = text(addressInfo, "StateOrProvince");
-                if (matchesQuery(query, name, address, locality, city) == false) {
-                    continue;
-                }
-
-                JsonNode connections = poi.path("Connections");
-                if (connections.isArray()) {
-                    for (JsonNode connection : connections) {
-                        JsonNode connectionType = connection.path("ConnectionType");
-                        String type = firstNonBlank(text(connectionType, "Title"), "Not listed");
-                        BigDecimal power = decimal(connection, "PowerKW");
-                        String current = firstNonBlank(text(connection.path("CurrentType"), "Title"), "");
-                        if (connectorType != null && !connectorType.isBlank()
-                                && !type.equalsIgnoreCase(connectorType)) {
-                            continue;
-                        }
-                        if (minPowerKw != null && (power == null || power.compareTo(minPowerKw) < 0)) {
-                            continue;
-                        }
-                        offers.add(toOffer(poi, addressInfo, connection, name, address, locality,
-                                city, type, power, current));
+            JsonNode connections = poi.path("Connections");
+            if (connections.isArray()) {
+                for (JsonNode connection : connections) {
+                    String type = normalizeConnector(text(connection.path("ConnectionType"), "Title"));
+                    BigDecimal power = decimal(connection, "PowerKW");
+                    String current = firstNonBlank(text(connection.path("CurrentType"), "Title"), "");
+                    if (connectorType != null && !connectorType.isBlank()
+                            && !type.equalsIgnoreCase(normalizeConnector(connectorType))) {
+                        continue;
                     }
-                } else {
-                    offers.add(toOffer(poi, addressInfo, null, name, address, locality, city,
-                            null, null, null));
+                    if (minPowerKw != null && (power == null || power.compareTo(minPowerKw) < 0)) {
+                        continue;
+                    }
+                    offers.add(toOffer(poi, addressInfo, connection, name, address,
+                            text(addressInfo, "AddressLine2"), city, type, power, current));
+                    if (offers.size() >= limit) break;
                 }
-                if (offers.size() >= limit) {
-                    break;
-                }
+            } else if (connectorType == null && minPowerKw == null) {
+                offers.add(toOffer(poi, addressInfo, null, name, address,
+                        text(addressInfo, "AddressLine2"), city, null, null, null));
             }
-            return List.copyOf(offers.subList(0, Math.min(limit, offers.size())));
-        } catch (RestClientException exception) {
-            // Discovery is supplemental; a provider outage should not take down search.
-            return List.of();
+            if (offers.size() >= limit) break;
+        }
+        return List.copyOf(offers.subList(0, Math.min(limit, offers.size())));
+    }
+
+    private List<JsonNode> fetchPois() {
+        long now = System.currentTimeMillis();
+        if (now < cacheExpiresAtMillis) return cachedPois;
+        synchronized (this) {
+            now = System.currentTimeMillis();
+            if (now < cacheExpiresAtMillis) return cachedPois;
+            String uri = UriComponentsBuilder.fromUriString(BASE_URL)
+                    .queryParam("output", "json")
+                    .queryParam("countrycode", "IN")
+                    .queryParam("latitude", HYDERABAD_LATITUDE)
+                    .queryParam("longitude", HYDERABAD_LONGITUDE)
+                    .queryParam("distance", 30)
+                    .queryParam("distanceunit", "KM")
+                    .queryParam("maxresults", 100)
+                    .queryParam("opendata", "true")
+                    .queryParam("compact", "false")
+                    .queryParam("verbose", "false")
+                    .build().encode().toUriString();
+            try {
+                JsonNode response = restClient.get()
+                        .uri(uri)
+                        .header("X-API-Key", apiKey)
+                        .header(HttpHeaders.USER_AGENT, "evPulse/0.1 (EV charging discovery)")
+                        .retrieve()
+                        .body(JsonNode.class);
+                List<JsonNode> records = new ArrayList<>();
+                if (response != null && response.isArray()) {
+                    response.forEach(records::add);
+                }
+                cachedPois = List.copyOf(records);
+            } catch (RestClientException exception) {
+                // Cache the empty response briefly; provider failure never breaks curated search.
+                cachedPois = List.of();
+            }
+            cacheExpiresAtMillis = System.currentTimeMillis() + CACHE_TTL_MILLIS;
+            return cachedPois;
         }
     }
 
@@ -134,24 +138,33 @@ public class OpenChargeMapService {
         if (!checked.isBlank()) {
             try {
                 checkedAt = OffsetDateTime.parse(checked);
-            } catch (Exception ignored) {
+            } catch (RuntimeException ignored) {
                 // Invalid upstream dates are represented as unavailable.
             }
         }
         int quantity = connection == null ? 0 : connection.path("Quantity").asInt(0);
         if (quantity < 0) quantity = 0;
-        BigDecimal latitude = decimal(addressInfo, "Latitude");
-        BigDecimal longitude = decimal(addressInfo, "Longitude");
         String operator = text(poi.path("OperatorInfo"), "Title");
         return new StationOffer(
                 -Math.max(id, 1), name, operator.isBlank() ? null : operator, address,
                 locality.isBlank() ? null : locality, city,
                 firstNonBlank(text(addressInfo, "StateOrProvince"), "Telangana"),
-                latitude, longitude, stationStatus, List.of(),
-                connectorType, powerKw, currentType.isBlank() ? null : currentType,
-                quantity, null, null, "INR", null, "UNVERIFIED",
+                decimal(addressInfo, "Latitude"), decimal(addressInfo, "Longitude"),
+                stationStatus, List.of(), connectorType, powerKw,
+                currentType.isBlank() ? null : currentType, quantity,
+                null, null, "INR", null, "UNVERIFIED",
                 "Open Charge Map", "https://openchargemap.org/site/poi/details/" + id,
                 checkedAt, false);
+    }
+
+    private static String normalizeConnector(String value) {
+        if (value == null || value.isBlank()) return "";
+        String normalized = value.toLowerCase().replaceAll("[^a-z0-9]", "");
+        if (normalized.contains("chademo")) return "CHADEMO";
+        if (normalized.contains("ccs") || normalized.contains("combo2")) return "CCS2";
+        if (normalized.contains("type2") || normalized.contains("iec62196")) return "TYPE2";
+        if (normalized.contains("gbt")) return "GB/T";
+        return value.trim().toUpperCase();
     }
 
     private static boolean matchesQuery(String query, String... fields) {
