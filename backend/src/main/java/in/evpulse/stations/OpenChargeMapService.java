@@ -135,6 +135,7 @@ public class OpenChargeMapService {
         int quantity = connection == null ? 0 : connection.path("Quantity").asInt(0);
         if (quantity < 0) quantity = 0;
         String operator = text(poi.path("OperatorInfo"), "Title");
+        String attribution = providerAttribution(poi);
         return new StationOffer(
                 -Math.max(id, 1), name, operator.isBlank() ? null : operator, address,
                 locality.isBlank() ? null : locality, city,
@@ -143,8 +144,32 @@ public class OpenChargeMapService {
                 stationStatus, List.of(), connectorType, powerKw,
                 currentType.isBlank() ? null : currentType, quantity,
                 null, null, "INR", null, "UNVERIFIED",
-                "Open Charge Map", "https://openchargemap.org/site/poi/details/" + id,
+                attribution, "https://openchargemap.org/site/poi/details/" + id,
                 null, false);
+    }
+
+    /**
+     * Open Charge Map requires visible attribution for the data provider and
+     * applicable license. Preserve this information in the source label shown
+     * on each station card instead of attributing every record to OCM alone.
+     */
+    private static String providerAttribution(JsonNode poi) {
+        JsonNode providers = poi.path("DataProviders");
+        if (providers.isArray()) {
+            for (JsonNode entry : providers) {
+                JsonNode provider = entry.path("DataProvider");
+                String title = text(provider, "Title");
+                String license = text(entry, "License");
+                boolean openData = entry.path("IsOpenData").asBoolean(false);
+                if (!title.isBlank()) {
+                    StringBuilder attribution = new StringBuilder("Open Charge Map · ").append(title);
+                    if (!license.isBlank()) attribution.append(" · ").append(license);
+                    if (openData) attribution.append(" · Open Data");
+                    return attribution.toString();
+                }
+            }
+        }
+        return "Open Charge Map · Open Data (provider attribution unavailable; open source record)";
     }
 
     private static String normalizeConnector(String value) {
