@@ -25,6 +25,7 @@ services:
       DATABASE_URL: jdbc:postgresql://db:5432/evpulse
       DATABASE_USERNAME: evpulse
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-evpulse-local-only}
+      OPENCHARGEMAP_API_KEY: ${OPENCHARGEMAP_API_KEY:-}
       PORT: 8080
       CORS_ALLOWED_ORIGINS: http://localhost:3000
     ports:
