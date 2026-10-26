@@ -119,6 +119,15 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function clearFilters() {
+    setCity("Hyderabad");
+    setQuery("");
+    setConnector("");
+    setMinPower("");
+    setMaxPrice("");
+    setSortBy("recommended");
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void search();
@@ -150,7 +159,7 @@ export default function Home() {
             <label className="field"><span>Connector</span><select value={connector} onChange={(e) => setConnector(e.target.value)}><option value="">Any connector</option><option value="CCS2">CCS2</option><option value="TYPE2">Type 2</option><option value="CHADEMO">CHAdeMO</option><option value="GB/T">GB/T</option><option value="Bharat AC-001">Bharat AC-001</option><option value="Bharat DC-001">Bharat DC-001</option></select></label>
             <label className="field compact-field"><span>Min power (kW)</span><input inputMode="decimal" type="number" min="0.1" step="0.1" value={minPower} onChange={(e) => setMinPower(e.target.value)} placeholder="Any" /></label>
             <label className="field compact-field"><span>Max ₹ / kWh</span><input inputMode="decimal" type="number" min="0" step="0.5" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} placeholder="Any" /></label>
-            <button className="search-button" type="submit" disabled={loading}>{loading ? "Searching…" : "Find chargers"} <span>↗</span></button>
+            <div className="filter-actions"><button className="clear-button" type="button" onClick={clearFilters} disabled={loading}>Clear filters</button><button className="search-button" type="submit" disabled={loading}>{loading ? "Searching…" : "Find chargers"} <span>↗</span></button></div>
           </div>
         </form>
       </section>
